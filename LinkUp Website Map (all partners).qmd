@@ -32,7 +32,7 @@ library(htmlwidgets)
 #| warning: false
 
 # load file with information on partners to map
-partners <- read_csv("test_locations2.csv") 
+partners <- read_csv("partners.csv") 
 
 # load Illinois boundary shapefile downloaded from:
 # https://clearinghouse.isgs.illinois.edu/data/reference/illinois-state-boundary
