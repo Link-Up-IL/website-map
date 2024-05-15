@@ -1,0 +1,502 @@
+---
+title: ""
+author: ""
+output:
+  html_document
+---
+
+
+```{r setup}
+#| echo: false
+#| message: false
+#| warning: false
+
+# This script creates a leaflet map displaying the locations of current Link Up IL partners.
+
+knitr::opts_chunk$set(suppress_messages = TRUE)
+
+rm(list = ls())
+
+library(tidyverse)
+library(sf)
+library(leaflet)
+library(leaflet.extras)
+library(htmltools)
+library(htmlwidgets)
+```
+
+
+```{r load partner data}
+#| echo: false
+#| message: false
+#| warning: false
+
+# load file with information on partners to map
+partners <- read_csv("test_locations2.csv") 
+
+# load Illinois boundary shapefile downloaded from:
+# https://clearinghouse.isgs.illinois.edu/data/reference/illinois-state-boundary
+illinois_polygon <- st_read("IL_BNDY_State/IL_BNDY_State_Py.shp", quiet = TRUE)
+```
+
+
+```{r rename columns}
+#| echo: false
+#| message: false
+#| warning: false
+
+# This chunk renames columns from the csv file (downloaded from the Google Sheet).
+# If column names are changed in the Google Sheet, they can just be adjusted once here
+# so that they'll be renamed to what that column is called throughout the script.
+# This avoids having to change every single time that column name appears in the script.
+# If a column name is changed in the Google Sheet, it should be adjusted below on the
+# right-hand side of the relevant line. The left hand-side of the equations should
+# never be changed or the rest of the script will not run!
+
+partners <- partners %>%
+  rename(
+    # "new name" = "old name",
+    "Name" = "Partner Program Name",
+    "Type" = "Type",
+    "Address" = "Visible Street Address",
+    "Address Line 2" = "Visible Street Address Line 2",
+    "City" = "City",
+    "State" = "State",
+    "Zip" = "Zip",
+    "Geocode Street" = "Geocode Street",
+    "Geocode City" = "Geocode City",
+    "Geocode State" = "Geocode State",
+    "Geocode Zip" = "Geocode Zip",
+    "Full Address" = "Full Address",
+    "Latitude" = "Latitude",
+    "Longitude" = "Longitude",
+    "Open Date" = "Open Date",
+    "Close Date" = "Close Date",
+    "Days"= "Days",
+    "Hours" = "Hours",
+    "Frequency" = "Frequency",
+    "Website" = "Website",
+    "Instagram" = "Instagram",
+    "Facebook" = "Facebook",
+    "Region" = "Region",
+    "Notes" = "Notes"
+  )
+```
+
+```{r convert to a geographic dataframe}
+#| echo: false
+#| message: false
+#| warning: false
+
+# create X and Y columns to save coordinates before converting to a geometry
+partners <- partners %>% mutate(
+  X = Longitude,
+  Y = Latitude
+)
+
+partners <- st_as_sf(partners,
+                     coords = c("Longitude", "Latitude"),
+                     crs = "+proj=longlat +datum=WGS84 +no_defs")
+```
+
+
+```{r create list of colors for markers/legends by type of partner}
+#| echo: false
+#| message: false
+#| warning: false
+
+# the colors below were chosen from the "Wong" palette on this website that provides
+# color-blind friendly color palettes:
+# https://davidmathlogic.com/colorblind/#%23000000-%23E69F00-%2356B4E9-%23009E73-%23F0E442-%230072B2-%23D55E00-%23CC79A7
+
+color_coding <- list(
+  "Farmers Market" = "#009E73",
+  "CSA" = "#56B4E9",
+  "Store" = "#D55E00",
+  "Mobile Market" = "#CC79A7",
+  "Farm Stand" = "#0072B2",
+  "Other" = "#E69F00"
+)
+```
+
+
+```{r update field formatting}
+#| echo: false
+#| message: false
+#| warning: false
+
+# remove elapsed time from hours field
+partners$hours_clean <- gsub("\\s*\\([^\\(]*\\)", "", partners$Hours)
+
+# identify whether locations have same hours each day
+partners$consistent_hours <- ifelse(
+  grepl("-", partners$hours_clean) & lengths(regmatches(partners$hours_clean, gregexpr("-", partners$hours_clean))) > 1,
+  "No", "Yes"
+)
+
+partners$days_clean <- ifelse(
+  partners$Days == "Monday, Tuesday, Wednesday, Thursday, Friday, Saturday, Sunday" & partners$consistent_hours == "Yes",
+  "7 Days a Week",
+  partners$Days
+)
+
+
+partners <- partners %>% 
+  relocate(Hours, .before = hours_clean) %>%
+  relocate(Days, .before = days_clean)
+
+```
+
+
+
+```{r hours and days for inconsistent locations}
+#| echo: false
+#| message: false
+#| warning: false
+
+# Prep data for locations with different hours on different days
+
+# split hour ranges into substrings for each location
+partners$hours_split <- lapply(partners$Hours, function(x) unlist(strsplit(x, "(?<=\\)\\s)", perl = TRUE)))
+partners$hours_split_clean <- lapply(partners$hours_split, function(x) gsub("\\s*\\([^\\(]*\\)", "", x))
+
+# split days into substrings for each location 
+partners$days_split <- lapply(partners$Days, function(x) unlist(strsplit(x, ",", perl = TRUE)))
+
+partners$pop_up_hours_inconsistent <- paste(
+  sep = "", # don't add a space between the different pieces of text defined below
+  
+  paste0("<b>", "Days and Hours", "</b>", "<br/>"),
+  
+  for (i in length(partners$days_split)) {
+    paste0(partners$days_split[i], ": ", partners$hours_split[i])
+  }
+)
+```
+
+
+```{r prep content for pop-up text}
+#| echo: false
+#| message: false
+#| warning: false
+
+# save new type variable with css color styling included based on above named list
+partners$type_styled <- paste0(
+  "<span style='color:",
+  color_coding[partners$Type],
+  ";'>",
+  partners$Type,
+  "</span>"
+)
+
+partners$type_color <- color_coding[match(partners$Type, names(color_coding))]
+partners$type_color <- paste0('"', partners$type_color, '"')
+
+# create link for google map directions to each location
+# see here for more info: https://developers.google.com/maps/documentation/urls/get-started
+# this link will open googlemaps with the location as destination and the user's location as starting point
+partners <- partners %>%
+  mutate(google_maps_link = paste(
+    "https://www.google.com/maps/dir/?api=1&destination=",
+    gsub(" ", "+", Address), # replace spaces with + signs in address, needed for googlemaps address formatting
+    "+",
+    City,
+    "+IL",
+    sep = ""
+    )
+  )
+```
+
+
+```{r save text for pop-ups - batched approach}
+#| echo: false
+#| message: false
+#| warning: false
+
+partners$pop_up_name_address <- paste(
+  sep = "", # don't add a space between the different pieces of text defined below
+
+  # partner name
+  paste0("<b>", partners$Name, "</b>", "<br/>"),
+
+  # partner address
+  if_else(is.na(partners$`Address Line 2`), # condition
+          paste0(partners$Address, "<br/>"), # text if true
+          paste0(partners$Address, "<br/>", partners$`Address Line 2`, "<br/>")), # text if false
+  if_else(is.na(partners$City), # condition
+          "", # text if true
+          paste0(partners$City, ", ", partners$State, "  ", partners$Zip, "<br/>")), # text if false
+
+  # link to googlemaps directions to partner address from user's current location
+  if_else(is.na(partners$City), # condition
+          "", # text if true
+          paste0("<b><a href='", partners$google_maps_link, "' target='_blank'>Get Directions</a></b>", "<br/>")), # text if false
+
+  # list type of partner
+  paste0("<br/>", "Type: ", partners$Type, "<br/>", "<br/>"))
+
+partners$pop_up_hours_consistent <- paste(
+  sep = "", # don't add a space between the different pieces of text defined below
+  
+  if_else(is.na(partners$days_clean), # condition
+          "", # text if true
+          paste0("<b>Days: </b>", partners$days_clean, "<br/>")), # text if false
+  if_else(is.na(partners$Hours), # condition
+          "", # text if true
+          paste0("<b>Hours: </b>", partners$hours_clean, "<br/>")), # text if false
+  if_else(is.na(partners$Frequency) | partners$Type == "Store", # condition
+          "", # text if true
+          paste0("<b>Frequency: </b>", partners$Frequency, "<br/>")), # text if false
+  if_else(is.na(partners$`Open Date`) | is.na(partners$`Close Date`), # condition
+          "", # text if true
+          paste0("<b>Season: </b>", partners$`Open Date`, " - ", partners$`Close Date`, "<br/>"))
+  )
+
+
+# Initialize the new column with an empty string
+partners$pop_up_hours_inconsistent <- ""
+
+# Loop through each row of the dataframe
+for (i in 1:nrow(partners)) {
+  # Check if the consistent_hours variable is "No" for the current row
+  if (partners$consistent_hours[i] == "No") {
+    # Initialize an empty string to hold the concatenated HTML for the current row
+    html_text <- "<b>Days and Hours</b><br/>"
+    
+    # Get the lengths of the current lists (assuming days_split and hours_split_clean have the same length)
+    len <- length(partners$days_split[[i]])
+    
+    # Loop through each element in the lists
+    for (j in 1:len) {
+      day <- paste0(sep = "", partners$days_split[[i]][j], "s")
+      hours <- partners$hours_split_clean[[i]][j]
+      
+      # Concatenate the day and hours in HTML format
+      html_text <- paste0(html_text, "<b>", day, ": ", "</b>", hours, "<br/>")
+    }
+    
+    # Assign the concatenated HTML to the new column for the current row
+    partners$pop_up_hours_inconsistent[i] <- html_text
+  }
+}
+
+
+partners$pop_up_social_media_notes <- paste(
+  sep = "", # don't add a space between the different pieces of text defined below
+  
+  # hyperlinks to website and social media when we have them
+  if_else(is.na(partners$Website), # check if we have website info
+          "", # don't add anything if no website
+          paste0("<br/> <b><a href='", partners$Website, "' target='_blank'>Website</a></b>")), # add website if exists
+  if_else(is.na(partners$Instagram), # check if we have instagram info
+          "", # don't add anything if no Instagram
+          if_else(is.na(partners$Website), # check if website exists for spacing
+                  paste0("<b><a href='", partners$Instagram, "' target='_blank'>Instagram</a></b>"), # add Instagram as first link
+                  paste0("    |    ", "<b><a href='", partners$Instagram, "' target='_blank'>Instagram</a></b>"))), # add Instagram as additional link
+  if_else(is.na(partners$Facebook), # check if we have Facebook info
+          "", # don't add anything if no Facebook
+          if_else(is.na(partners$Website) & is.na(partners$Instagram), # check if website or instagram exists for spacing
+                  paste0("<b><a href='", partners$Facebook, "' target='_blank'>Facebook</a></b>", "<br/>"), # add Facebook as first link
+                  paste0("    |    ", "<b><a href='", partners$Facebook, "' target='_blank'>Facebook</a></b>", "<br/>"))), # add Facebook as additional link
+
+  # add any additional notes at the bottom
+  if_else(is.na(partners$Notes), # condition
+          "", # text if true
+          paste0("<br/>", partners$Notes)) # text if false
+)
+  
+
+partners$pop_up_content <- paste(
+  sep = "",
+  partners$pop_up_name_address,
+  if_else(
+    partners$consistent_hours == "Yes",
+    partners$pop_up_hours_consistent,
+    partners$pop_up_hours_inconsistent
+  ),
+  partners$pop_up_social_media_notes
+)  
+
+```
+
+
+
+```{r create shapes for use in map}
+#| echo: false
+#| message: false
+#| warning: false
+
+# Create bounding box for the map to be able to set the most zoomed out view to the whole state, not further
+# adapted from this suggestion: https://stackoverflow.com/questions/51392181/setting-boundaries-of-leaflet-with-sf-geometry-in-r 
+IL_bbox <- st_bbox(illinois_polygon) %>%
+  as.vector()
+# the above code returns the longitude and latitude coordinates needed to create a box around Illinois
+
+# save coordinates of bounding box (with first corner repeated at end) as a matrix to use for polygon creation
+IL_bbox_coords <- matrix(
+  c(IL_bbox[1], IL_bbox[2],
+    IL_bbox[1], IL_bbox[4],
+    IL_bbox[3], IL_bbox[4],
+    IL_bbox[3], IL_bbox[2],
+    IL_bbox[1], IL_bbox[2]
+  ),
+  ncol = 2, byrow = TRUE
+)
+
+# using the matrix saved above, create the polygon shape of the bounding box around Illinois
+IL_bbox_polygon <- st_polygon(list(IL_bbox_coords))
+
+# create a polygon that is larger than Illinois and the full view of the map
+# we'll use this polygon to shade the portion of the map outside of Illinois
+buffer_polygon <- st_buffer(IL_bbox_polygon, dist = 10)
+# convert buffer_polygon to same CRS as Illinois shapefile
+buffer_polygon <- st_sf(geometry = st_sfc(buffer_polygon)) # convert to an sf object so that we can add a CRS
+st_crs(buffer_polygon) <- st_crs(illinois_polygon) # convert crs
+
+# now cut out Illinois shape from the buffer polygon
+outside_IL <- st_difference(buffer_polygon, illinois_polygon)
+# now we can use outside_IL to color the portion of the map outside of IL in our map!
+
+# generate the coordinates of the point at the center of the Illinois bounding box
+# which will be used to center the map in the next code chunk
+center_lat <- mean(IL_bbox[c(1, 3)])
+center_lng <- mean(IL_bbox[c(2, 4)])
+```
+
+
+
+```{r create leaflet map}
+#| echo: false
+#| message: false
+#| warning: false
+
+
+# Create base of the Leaflet map
+my_map <- leaflet(options = leafletOptions(minZoom = 6)) %>%
+  # add background map graphics
+  addTiles("https://tile.jawg.io/jawg-light/{z}/{x}/{y}{r}.png?access-token=l24afZxkZQRuUAv4lcP6YHbkjTs0OFa0JWOOJNmwccbMDQ0vsUGB3td3H5Ufm17s") %>%
+  # add colored layer outside of IL
+  addPolygons(data = outside_IL, opacity = 0, fillColor = "#942923", fillOpacity = 0.75) %>%
+  # add outline of Illinois
+  addPolygons(data = illinois_polygon, color = "#942923", weight = 1, opacity = 1, fillOpacity = 0) %>%
+  # set initial map view to show all of Illinois by setting the bounds
+  fitBounds(IL_bbox[1], IL_bbox[2], IL_bbox[3], IL_bbox[4]) %>%
+  # set the maximum bounds over which the user can pan the map
+  # note: if any information is added to the popup, might need to increase the number adding to
+  # IL_bbox[4] below so that entire pop-ups for northern-most partners are fully viewable
+  # in the fully zoomed-out version of the map
+  setMaxBounds(IL_bbox[1] - 1, IL_bbox[2] - 1, IL_bbox[3] + 1, IL_bbox[4] + 5)
+# my_map is now a map of Illinois with the portion outside of IL colored in
+
+
+# Create function that adds markers to the map for each category of partner (e.g. farmers market, store, etc.)
+# this function takes as inputs the map, list of partners, and a specific partner type
+# and creates the markers and pop-ups for that type of partner
+addMarkersByType <- function(map, partners, type) {
+  # subset only the partners of this type
+  filtered_partners <- partners %>% filter(type_styled == type)
+  marker_color <- color_coding[[filtered_partners$Type[1]]]
+
+
+  map <- map %>%
+    addCircleMarkers(
+      lng = filtered_partners$X,
+      lat = filtered_partners$Y,
+      radius = 5,
+      stroke = TRUE,
+      color = marker_color,
+      weight = 0.5,
+      opacity = 0.8,
+      fill = TRUE,
+      fillColor = marker_color,
+      fillOpacity = 0.6,
+      popup = filtered_partners$pop_up_content,
+      group = type
+    )
+  return(map)
+}
+
+
+# Generate a list of the unique partner types
+partner_types <- unique(partners$type_styled)
+
+# Using function defined above inside a for-loop, add layers of markers to the map
+for (type in partner_types) {
+  my_map <- addMarkersByType(my_map, partners, type)
+}
+
+# Add layer control to allow for turning on/off of different partner type markers on the map
+my_map <- my_map %>%
+  addLayersControl(
+    overlayGroups = partners$type_styled,
+    position = "topright",
+    options = layersControlOptions(collapsed = FALSE)
+  )
+
+
+# save a function for resetting the map view to fully zoomed out
+resetMaptoIL <- JS(paste(
+  "function(btn, map){",
+  sprintf("  map.setView([%f, %f], 6);", center_lat, center_lng),
+  "}"
+  )
+)
+
+# save function for zooming map to view of Chicago
+Chi_center_lat <- 41.82696228156946
+Chi_center_lng <- -87.67155826326643
+zoomToChicago <- JS(paste(
+  "function(btn, map){",
+  sprintf("  map.setView([%f, %f], 10);", Chi_center_lat, Chi_center_lng),
+  "}"
+  )
+)
+
+# Add a search by address function and button to reset map to whole state view
+my_map <- my_map %>%
+  # add button to reset map to fully zoomed out view of full state
+  addEasyButton(easyButton(
+    icon = "fa-globe",
+    title = "Reset Full State View",
+    onClick = resetMaptoIL
+    )
+  ) %>%
+  # add a Zoom to Chicago button
+  addEasyButton(easyButton(
+    icon = "fa-star",
+    title = "Zoom to Chicago",
+    onClick = zoomToChicago
+    )
+  ) %>%
+  # this adds a search by address bar to the map
+  addSearchOSM(options = searchOptions(hideMarkerOnCollapse = TRUE))
+  # consulted for help with getting rid of blue zoom circle when zooming back out:
+  # https://github.com/bhaskarvk/leaflet.extras/issues/209
+
+# add minimap to bottom right corner as an additional panning option
+my_map <- my_map %>% addMiniMap(zoomLevelFixed = 4,
+                                toggleDisplay = TRUE,
+                                minimized = TRUE)
+
+
+# View the map!
+my_map
+
+# stop rendering (so maps in below chunks won't get included in the html file)
+knitr::knit_exit()
+```
+
+
+```{r save data}
+partners_lat_lon <- partners %>%
+  rename(Latitude = Y, Longitude = X)
+
+write_csv(partners_lat_lon, "data/output/partners_lat_lon.csv")
+
+partners_no_popup <- partners %>% select(-pop_up_content)
+write_csv(partners_no_popup, "data/output/partners_no_popup.csv")
+
+st_write(partners, "data/output/partners.shp")
+st_write(partners_no_popup, "data/output/partners_no_popup.shp")
+```
+
