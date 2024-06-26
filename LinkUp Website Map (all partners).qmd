@@ -32,7 +32,7 @@ library(htmlwidgets)
 #| warning: false
 
 # load file with information on partners to map
-partners <- read_csv("partners_June19.csv") 
+partners <- read_csv("partners.csv") 
 
 # load Illinois boundary shapefile downloaded from:
 # https://clearinghouse.isgs.illinois.edu/data/reference/illinois-state-boundary
@@ -77,7 +77,7 @@ partners <- partners %>%
   rename(
     # "new name in R" = "old name in csv",
     "Name" = "Partner Program Name",
-    "Type Specific" = "Type",
+    "Type Original" = "Type",
     "Address" = "Visible Street Address",
     "Address Line 2" = "Visible Street Address Line 2",
     "City" = "City",
@@ -124,7 +124,26 @@ partners <- st_as_sf(partners,
 # Partner types displayed on the map will be a bit more general than those in Airtable.
 # They will include: Farmers Market, Winter Market, Farm Stand, Retail Locations, Other
 # The other category will include CSAs, Mobile Markets, Grocery Deliveries, and any other
-# type of partner not specified for one of the other categories.
+# type of partner not specified for one of the other categories. The general categories
+# will be used for the legend and color coding. The pop-up for each location will list a
+# more specific type. In the case of Farmers Markets, Winter Markets, and Farm Stands the
+# general and specific types are the same. In the case of Retail Locations, there will be 
+# 3 sub-types, and the Other category will also have a more specific type for each. The 
+# types are re-coded below to update this field for the retail locations since the original
+# coding has lengthy names and 4 categories (we'll combine two of them).
+
+# recode the Retail Locations to shorter names
+partners <- partners %>%
+  mutate(
+    `Type Specific` = case_when(
+      `Type Original` == "Full-Service Supermarket" ~ "Supermarket",
+      `Type Original` %in% c(
+        "Neighborhood Grocer/Small Grocery Store",
+        "Corner Store/Convenience Store Grocer/Small Grocery Store"
+        ) ~ "Neighborhood Grocer",
+      TRUE ~ `Type Original` # keep original type for all others
+    )
+  )
 
 # If changes need to be made to the way partners are grouped into categories for the
 # map layers (a layer has its own color and checkbox in the legend to view/hide), 
@@ -155,10 +174,9 @@ partners <- partners %>%
     `Type Specific` == "Farmers Market" ~ "Farmers Market",
     `Type Specific` == "Winter Market" ~ "Winter Market",
     `Type Specific` == "Farm Stand" ~ "Farm Stand",
-    `Type Specific` %in% c("Full-Service Supermarket", 
+    `Type Specific` %in% c("Supermarket", 
                            "Food Co-op",
-                           "Neighborhood Grocer/Small Grocery Store",
-                           "Corner Store/Convenience Store Grocer/Small Grocery Store"
+                           "Neighborhood Grocer"
                            ) ~ "Retail Location",
     TRUE ~ "Other" # assigns all other values to Other
   ))
@@ -392,7 +410,7 @@ partners$pop_up_name_address <- paste(
           paste0("<b><a href='", partners$google_maps_link, "' target='_blank'>Get Directions</a></b>", "<br/>")), # text if false
 
   # list type of partner
-  paste0("<br/>", "Type: ", partners$Type, "<br/>", "<br/>"))
+  paste0("<br/>", "Type: ", partners$`Type Specific`, "<br/>", "<br/>"))
 
 # Days, Hours, Season portion of pop-up (for places with consistent hours)
 partners$pop_up_hours_consistent <- paste(
