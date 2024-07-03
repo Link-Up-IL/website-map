@@ -32,7 +32,7 @@ library(htmlwidgets)
 #| warning: false
 
 # load file with information on partners to map
-partners <- read_csv("partners.csv") 
+partners <- read_csv("Website Map csv for R - Sheet1.csv") 
 
 # load Illinois boundary shapefile downloaded from:
 # https://clearinghouse.isgs.illinois.edu/data/reference/illinois-state-boundary
@@ -572,9 +572,9 @@ my_map <- leaflet(options = leafletOptions(minZoom = 6)) %>%
   # add background map graphics
   addTiles("https://tile.jawg.io/jawg-light/{z}/{x}/{y}{r}.png?access-token=l24afZxkZQRuUAv4lcP6YHbkjTs0OFa0JWOOJNmwccbMDQ0vsUGB3td3H5Ufm17s") %>%
   # add colored layer outside of IL
-  addPolygons(data = outside_IL, opacity = 0, fillColor = "#7393B3", fillOpacity = 0.75) %>%
+  addPolygons(data = outside_IL, opacity = 0, fillColor = "#cfe5ae", fillOpacity = 0.75) %>%
   # add outline of Illinois
-  addPolygons(data = illinois_polygon, color = "#7393B3", weight = 1, opacity = 1, fillOpacity = 0) %>%
+  addPolygons(data = illinois_polygon, color = "#cfe5ae", weight = 1, opacity = 1, fillOpacity = 0) %>%
   # set initial map view to show all of Illinois by setting the bounds
   fitBounds(IL_bbox[1], IL_bbox[2], IL_bbox[3], IL_bbox[4]) %>%
   # set the maximum bounds over which the user can pan the map
@@ -597,11 +597,11 @@ addMarkersByType <- function(map, partners, type) {
     addCircleMarkers(
       lng = filtered_partners$X,
       lat = filtered_partners$Y,
-      radius = 5,
+      radius = 3,
       stroke = TRUE,
       color = marker_color,
       weight = 0.5,
-      opacity = 0.8,
+      opacity = 1,
       fill = TRUE,
       fillColor = marker_color,
       fillOpacity = 0.6,
@@ -675,9 +675,9 @@ my_map <- my_map %>%
   # https://github.com/bhaskarvk/leaflet.extras/issues/209
 
 # add minimap to bottom right corner as an additional panning option
-my_map <- my_map %>% addMiniMap(zoomLevelFixed = 4,
-                                toggleDisplay = TRUE,
-                                minimized = TRUE)
+# my_map <- my_map %>% addMiniMap(zoomLevelFixed = 4,
+#                                 toggleDisplay = TRUE,
+#                                 minimized = TRUE)
 
 
 # View the map!
