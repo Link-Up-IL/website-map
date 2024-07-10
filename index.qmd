@@ -204,10 +204,10 @@ partners <- partners %>%
 
 color_coding <- list(
   "Farmers Market" = "#009E73",
-  "Winter Market" = "#56B4E9",
+  "Extra" = "#56B4E9", # an alternative shade of blue that works well (note there is no Extra category for map, just putting the color code here for safe-keeping)
   "Farm Stand" = "#D55E00",
   "Retail Location" = "#CC79A7",
-  "Extra" = "#0072B2", # an alternative shade of blue that works well (note there is no Extra category for map, just putting the color code here for safe-keeping)
+  "Winter Market" = "#0072B2",
   "Other" = "#E69F00"
 )
 ```
