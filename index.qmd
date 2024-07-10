@@ -5,15 +5,6 @@ output:
   html_document
 ---
 
-```{css background color}
-#| echo: false
-#| message: false
-#| warning: false
-
-body{background-color: transparent}
-
-```
-
 
 ```{r setup}
 #| echo: false
@@ -699,7 +690,12 @@ my_map <- my_map %>%
     )
   ) %>%
   # this adds a search by address bar to the map
-  addSearchOSM(options = searchOptions(hideMarkerOnCollapse = TRUE))
+  addSearchOSM(options = searchOptions(hideMarkerOnCollapse = TRUE)) %>%
+  
+  # change the text that appears in the search box for OSM geocoder
+  onRender("function(el, x) {
+        $('input.search-input')[0].placeholder = 'Enter Address'
+        }")
   # consulted for help with getting rid of blue zoom circle when zooming back out:
   # https://github.com/bhaskarvk/leaflet.extras/issues/209
 
@@ -711,10 +707,28 @@ my_map <- my_map %>%
 
 # View the map!
 my_map
+```
+
+
+```{css background color}
+#| echo: false
+#| message: false
+#| warning: false
+
+body{background-color: transparent}
+
+```
+
+
+```{r end rendering}
+#| echo: false
+#| message: false
+#| warning: false
 
 # stop rendering (so maps in below chunks won't get included in the html file)
 knitr::knit_exit()
 ```
+
 
 
 ```{r save data}
