@@ -555,8 +555,9 @@ outside_IL <- st_difference(buffer_polygon, illinois_polygon)
 
 # generate the coordinates of the point at the center of the Illinois bounding box
 # which will be used to center the map in the next code chunk
-center_lat <- mean(IL_bbox[c(1, 3)])
-center_lng <- mean(IL_bbox[c(2, 4)])
+center_lng <- mean(IL_bbox[c(1, 3)])
+center_lat <- mean(IL_bbox[c(2, 4)])
+off_center_lng <- center_lng - 1.5 - 2 
 ```
 
 
@@ -601,8 +602,10 @@ my_map <- leaflet(options = leafletOptions(minZoom = 6)) %>%
   # note: if any information is added to the popup, might need to increase the number adding to
   # IL_bbox[4] below so that entire pop-ups for northern-most partners are fully viewable
   # in the fully zoomed-out version of the map
-  setMaxBounds(IL_bbox[1] - 1, IL_bbox[2] - 1, IL_bbox[3] + 1, IL_bbox[4] + 5)
-# my_map is now a map of Illinois with the portion outside of IL colored in
+  setMaxBounds(IL_bbox[1] - 3, IL_bbox[2] - 3, IL_bbox[3] + 3, IL_bbox[4] + 6) 
+  # center the initial map view (using fitBounds instead for now)
+  #setView(off_center_lng, center_lat, zoom = 6)
+  # my_map is now a map of Illinois with the portion outside of IL colored in
 
 # LinkUp red: "#942923"
 # Create function that adds markers to the map for each category of partner (e.g. farmers market, store, etc.)
@@ -644,7 +647,7 @@ for (type in partner_types) {
 my_map <- my_map %>%
   addLayersControl(
     overlayGroups = partners$type_styled,
-    position = "topright",
+    position = "bottomleft",
     options = layersControlOptions(collapsed = FALSE)
   )
 
