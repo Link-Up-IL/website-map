@@ -567,6 +567,26 @@ center_lng <- mean(IL_bbox[c(2, 4)])
 
 # This code chunk finally creates the map! 
 
+# There are a few map formatting changes that can be made in this code chunk:
+# (1) Changing the background map graphics: 
+      # substitute the url in the addTiles() line of code (second line of code below) 
+      # (make sure to keep the access-token portion the same)
+# (2) Changing the color of the background for outside of Illinois:
+      # In the first group of code below, the two relevant lines of code are 
+      # those that begin with addPolygons()
+      # The first of these lines adds the shading for area outside of Illinois. To
+      # change the color change the color code for fillColor. To change the opacity,
+      # adjust the fillOpacity argument. 0 is totally see through, 1 is totally opaque.
+      # The second of these lines adds an outline for the State of Illinois that just helps
+      # Illinois pop a bit more visually. You can adjust the color argument, the weight argument
+      # controls the thickness of this line, and opacity argument (not fillOpacity) controls the opacity.
+# (3) Changing the size of the circle markers for partner locations:
+      # Find the second section of code below that starts with addMarkersByType
+      # The radius argument controls the size of the circles. Higher numbers = bigger circles.
+      # The weight argument controls the thickness of the outline for the circle.
+      # The opacity argument controls the opacity of the outline (1 = opaque, 0 = see-through).
+      # The fillOpacity argument controls the opacity of the color inside the circle marker.
+
 # Create base of the Leaflet map (with chosen background, Zoom level, outside IL shading)
 my_map <- leaflet(options = leafletOptions(minZoom = 6)) %>%
   # add background map graphics
