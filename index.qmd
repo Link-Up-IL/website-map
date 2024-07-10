@@ -5,6 +5,15 @@ output:
   html_document
 ---
 
+```{css background color}
+#| echo: false
+#| message: false
+#| warning: false
+
+body{background-color: transparent}
+
+```
+
 
 ```{r setup}
 #| echo: false
