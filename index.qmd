@@ -694,13 +694,31 @@ my_map <- my_map %>%
   ) %>%
   # this adds a search by address bar to the map
   addSearchOSM(options = searchOptions(hideMarkerOnCollapse = TRUE)) %>%
+  # consulted for help with getting rid of blue zoom circle when zooming back out:
+  # https://github.com/bhaskarvk/leaflet.extras/issues/209
   
   # change the text that appears in the search box for OSM geocoder
   onRender("function(el, x) {
         $('input.search-input')[0].placeholder = 'Enter Address'
         }")
-  # consulted for help with getting rid of blue zoom circle when zooming back out:
-  # https://github.com/bhaskarvk/leaflet.extras/issues/209
+  
+# custom JavaScript to allow the marker size to depend on zoom level
+js_marker_size <- "
+function(el, x) {
+  var map = this;
+  map.on('zoomend', function() {
+    var currentZoom = map.getZoom();
+    map.eachLayer(function(layer) {
+      if (layer.setRadius) {
+        layer.setRadius(currentZoom / 2);
+      }
+    });
+  });
+}
+"
+
+my_map <- my_map %>% onRender(js_marker_size)
+
 
 # add minimap to bottom right corner as an additional panning option
 # my_map <- my_map %>% addMiniMap(zoomLevelFixed = 4,
