@@ -139,7 +139,8 @@ partners <- partners %>%
       `Type Original` == "Full-Service Supermarket" ~ "Supermarket",
       `Type Original` %in% c(
         "Neighborhood Grocer/Small Grocery Store",
-        "Corner Store/Convenience Store Grocer/Small Grocery Store"
+        "Corner Store/Convenience Store Grocer/Small Grocery Store",
+        "Mid-sized Grocery Store"
         ) ~ "Neighborhood Grocer",
       TRUE ~ `Type Original` # keep original type for all others
     )
