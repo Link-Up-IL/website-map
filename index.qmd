@@ -601,7 +601,7 @@ off_center_lng <- center_lng - 1.5 - 2
       # marker size. The 2 can be changed, or potentially more complicated functions could be written.
 
 # Create base of the Leaflet map (with chosen background, Zoom level, outside IL shading)
-my_map <- leaflet(options = leafletOptions(minZoom = 6)) %>%
+my_map <- leaflet(options = leafletOptions(minZoom = 7)) %>%
   # add background map graphics
   addTiles("https://tile.jawg.io/jawg-light/{z}/{x}/{y}{r}.png?access-token=l24afZxkZQRuUAv4lcP6YHbkjTs0OFa0JWOOJNmwccbMDQ0vsUGB3td3H5Ufm17s") %>%
   # add colored layer outside of IL
@@ -666,7 +666,7 @@ my_map <- my_map %>%
 # save a function for resetting the map view to fully zoomed out
 resetMaptoIL <- JS(paste(
   "function(btn, map){",
-  sprintf("  map.setView([%f, %f], 6);", center_lat, center_lng),
+  sprintf("  map.setView([%f, %f], 7);", center_lat, center_lng),
   "}"
   )
 )
@@ -676,7 +676,7 @@ Chi_center_lat <- 41.82696228156946
 Chi_center_lng <- -87.67155826326643
 zoomToChicago <- JS(paste(
   "function(btn, map){",
-  sprintf("  map.setView([%f, %f], 10);", Chi_center_lat, Chi_center_lng),
+  sprintf("  map.setView([%f, %f], 11);", Chi_center_lat, Chi_center_lng),
   "}"
   )
 )
