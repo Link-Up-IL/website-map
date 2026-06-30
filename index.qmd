@@ -10,9 +10,9 @@ format:
 
 
 ```{r setup}
-#/ echo: false
-#/ message: false
-#/ warning: false
+#| echo: false
+#| message: false
+#| warning: false
 
 # This script creates an interactive map displaying the locations of current Link Up IL partners.
 
@@ -744,9 +744,9 @@ my_map
 
 
 ```{css background color}
-#| echo: false
-#| message: false
-#| warning: false
+/*| echo: false */
+/*| message: false */
+/*| warning: false */
 
 body{background-color: transparent}
 
